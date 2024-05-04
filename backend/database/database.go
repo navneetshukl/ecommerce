@@ -88,23 +88,28 @@ func (DB *Mongo) Insert() {
 
 }
 
-func (DB *Mongo) CheckUser(email string) (bool, error) {
+// CheckUser function return the user based on email of the user
+func (DB *Mongo) CheckUser(email string) (bool, error, models.User) {
 	database := DB.client.Database("shopping")
 	collection := database.Collection("users")
 
 	var user models.User
+	fmt.Println("Email from database is ", email)
 
 	err := collection.FindOne(context.Background(), models.User{Email: email}).Decode(&user)
+
+	fmt.Println("USer from databaase is ", user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return false, nil
+			return false, nil, user
 		}
-		return false, err
+		return false, err, user
 	}
 
-	return true, nil
+	return true, nil, user
 }
 
+// InsertIntoUser function help in inserting to the database
 func (DB *Mongo) InsertIntoUser(user *models.User) (bool, error) {
 
 	database := DB.client.Database("shopping")

@@ -15,4 +15,6 @@ type User struct {
 	Address   string             `bson:"address,omitempty" json:"address" binding:"required"`
 	Role      int                `bson:"role,omitempty" json:"role"`
 	Timestamp time.Time          `bson:"timestamp,omitempty" json:"timestamp"`
+	CreatedAt primitive.DateTime `bson:"created_at,omitempty" json:"created_at"`
+	UpdatedAt primitive.DateTime `bson:"updated_at,omitempty" json:"updated_at"`
 }

@@ -13,6 +13,6 @@ type Mongo struct {
 type dbHandler interface {
 	ConnectDB() *mongo.Client
 	Insert()
-	CheckUser(email string) (bool, error)
+	CheckUser(email string) (bool, error, models.User)
 	InsertIntoUser(user models.User) (bool, error)
 }

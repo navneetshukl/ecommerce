@@ -5,9 +5,12 @@ import (
 	"ecommerce/models"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -69,7 +72,8 @@ func Register(c *gin.Context) {
 
 	}
 
-	exist, err := DBHelper.CheckUser(user.Email)
+	exist, err, _ := DBHelper.CheckUser(user.Email)
+
 	if err != nil {
 
 		log.Println("Error in checking the user ", err)
@@ -99,8 +103,10 @@ func Register(c *gin.Context) {
 	}
 
 	user.Password = string(hashedPassword)
-	user.Role = 0
+	user.Role = 2
 	user.Timestamp = time.Now().UTC()
+	user.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
+	user.UpdatedAt = primitive.NewDateTimeFromTime(time.Now())
 
 	_, err = DBHelper.InsertIntoUser(&user)
 	if err != nil {
@@ -117,4 +123,111 @@ func Register(c *gin.Context) {
 		"user":    user,
 	})
 
+}
+
+// Login
+
+func Login(c *gin.Context) {
+	var user map[string]interface{}
+
+	err := c.BindJSON(&user)
+	if err != nil {
+		log.Println("Error in reading the body response ", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Error in reading the body",
+		})
+
+		return
+	}
+
+	eLen := len(user["email"].(string))
+	pLen := len(user["password"].(string))
+
+	if eLen == 0 || pLen == 0 {
+		log.Println("Enter Email and Password")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "please enter the email and password",
+		})
+		return
+	}
+
+	exists, err, data := DBHelper.CheckUser(user["email"].(string))
+
+	if err != nil {
+		log.Println("Error in checking the user from database ", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Error in getting the user information",
+		})
+		return
+	}
+
+	if !exists {
+		log.Println("User does not exist")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "User does not exist",
+		})
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(data.Password), []byte(user["password"].(string)))
+	if err != nil {
+
+		log.Println("Password does not match")
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Password does not match",
+		})
+
+		return
+
+	}
+
+	// Create JWT token
+
+	secret := os.Getenv("SECRET_KEY")
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": data.Email,
+		"exp": time.Now().Add(time.Hour * 24 * 30).Unix(),
+	})
+	tokenString, err := token.SignedString([]byte(secret))
+
+	if err != nil {
+		log.Println("Error in signing the token ", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Some Error Occured.Please try again",
+		})
+		return
+	}
+
+	// Save this JWT token to Cookie
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("Authorization", tokenString, int(time.Hour*24*30), "/", "", false, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "User Login Successfully",
+		"user": gin.H{
+			"name":  data.Name,
+			"email": data.Email,
+			"phone": data.Phone,
+			"token": tokenString,
+		},
+	})
+
+}
+
+func Test(c *gin.Context) {
+
+	email, _ := c.Get("user")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User logged in",
+		"Value":   email.(string),
+	})
 }
