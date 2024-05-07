@@ -28,10 +28,11 @@ func Authenticate(c *gin.Context) {
 
 	if err != nil {
 		log.Println("Error in Getting the Tokenstring from cookie ", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"message": "Unable to get the token string",
-		})
+		// c.JSON(http.StatusInternalServerError, gin.H{
+		// 	"success": false,
+		// 	"message": "Unable to get the token string",
+		// })
+		c.AbortWithStatus(401)
 		return
 
 	}
@@ -46,29 +47,35 @@ func Authenticate(c *gin.Context) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 
 		if float64(time.Now().Unix()) > claims["exp"].(float64) {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"message": "Please login",
-			})
+			log.Println("Token is expired.")
+			// c.JSON(http.StatusBadRequest, gin.H{
+			// 	"success": false,
+			// 	"message": "Please login",
+			// })
+			c.AbortWithStatus(401)
 			return
 
 		}
 		email := claims["sub"].(string)
 		if len(email) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"message": "Please login",
-			})
+			log.Println("Email is not found from cookie.")
+			// c.JSON(http.StatusBadRequest, gin.H{
+			// 	"success": false,
+			// 	"message": "Please login",
+			// })
+			c.AbortWithStatus(401)
 			return
 		}
 		c.Set("user", email)
 		c.Next()
 
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Please login",
-		})
+		log.Println("JWT token is not set")
+		// c.JSON(http.StatusBadRequest, gin.H{
+		// 	"success": false,
+		// 	"message": "Please login",
+		// })
+		c.AbortWithStatus(401)
 		return
 
 	}
@@ -85,25 +92,37 @@ func IsAdmin(c *gin.Context) {
 			"message": "Please login",
 		})
 		return
-
 	}
 
-	exist, err, user := DBHelper.CheckUser(email.(string))
-	if !exist || err != nil {
+	userEmail := email.(string)
+	exist, err, user := DBHelper.CheckUser(userEmail)
+	if err != nil {
 		log.Println("Error in getting the user for admin check ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": "SOme error occured in getting user",
+			"message": "Some error occurred in getting user",
 		})
 		return
 	}
-	if user.Role == 1 {
-		log.Println("User is not Admin")
-		c.JSON(http.StatusBadRequest, gin.H{
+
+	if !exist {
+		log.Println("User not found")
+		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"message": "User is not Admin.",
+			"message": "User not found",
 		})
 		return
 	}
+
+	if user.Role != 1 {
+		log.Println("User is not Admin")
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"message": "User is not Admin",
+		})
+		return
+	}
+
+	log.Println("User is Admin")
 	c.Next()
 }

@@ -229,5 +229,6 @@ func Test(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User logged in",
 		"Value":   email.(string),
+		"role":    "Admin",
 	})
 }
